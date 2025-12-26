@@ -42,7 +42,6 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
 
 // Токен по умолчанию (можно переопределить через переменную окружения)
 const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '281ffa76936d4d230b0567431060516bfba2545d';
-
 // Функция для получения токена из localStorage или использования токена по умолчанию
 const getToken = (): string | null => {
   // В Server Components (нет window) всегда используем токен по умолчанию
@@ -188,4 +187,8 @@ export const authApi = {
       setAuthToken(null);
     }
   },
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 9a59b70c633a0b85ca377fbdb8c9aa410f6c1e27
