@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateEstimateSection, createEstimateSection, updateEstimateSectionWorkType, createEstimateSectionWorkType, deleteEstimateSectionWorkType, deleteEstimateSection, getWorkTypes } from '@/lib/api/estimates';
 import type { EstimateSectionDetail, EstimateSectionWorkTypeDetail, WorkType } from '@/types';
@@ -15,12 +15,19 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
   const router = useRouter();
   const [totalArea, setTotalArea] = useState<string>(section.total_area.toString());
   const [isSavingArea, setIsSavingArea] = useState(false);
-  const [editingPercentages, setEditingPercentages] = useState<Record<number, string>>({});
+  const [isEditingArea, setIsEditingArea] = useState(false);
+  const [editingPercentages, setEditingPercentages] = useState<Record<string, string>>({});
   const [allWorkTypes, setAllWorkTypes] = useState<EstimateSectionWorkTypeDetail[]>([]);
 
   // Загружаем все типы работ из справочника для данного вида работ
   useEffect(() => {
     const loadWorkTypes = async () => {
+      // Проверяем, нужно ли загружать
+      if (!section.work_category) {
+        setAllWorkTypes((section.work_types || []) as EstimateSectionWorkTypeDetail[]);
+        return;
+      }
+
       try {
         const response = await getWorkTypes(section.work_category);
         const workTypesFromCatalog = (response.results || []) as WorkType[];
@@ -38,7 +45,7 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
           }
           // Создаем временный тип работ для типа, которого нет в разделе
           return {
-            id: 0, // Временный ID
+            id: 0,
             section: section.id,
             section_info: '',
             work_type: workType.id,
@@ -52,18 +59,13 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
         setAllWorkTypes(combinedWorkTypes);
       } catch (err) {
         console.error('Ошибка при загрузке типов работ:', err);
-        // Если не удалось загрузить, используем только существующие типы работ
         setAllWorkTypes((section.work_types || []) as EstimateSectionWorkTypeDetail[]);
       }
     };
 
-    // Загружаем только если раздел существует (id > 0) или если есть work_category
-    if (section.work_category) {
-      loadWorkTypes();
-    } else {
-      setAllWorkTypes((section.work_types || []) as EstimateSectionWorkTypeDetail[]);
-    }
-  }, [section]);
+    loadWorkTypes();
+    // Зависимости: только work_category и id раздела, чтобы не перезагружать при каждом изменении
+  }, [section.work_category, section.id]);
 
   const handleAreaSave = async () => {
     const area = parseFloat(totalArea);
@@ -100,7 +102,7 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
     }
   };
 
-  const handlePercentageSave = async (workTypeKey: number, workType: EstimateSectionWorkTypeDetail, value: string) => {
+  const handlePercentageSave = async (workTypeKey: string, workType: EstimateSectionWorkTypeDetail, value: string) => {
     const percentage = parseFloat(value);
     if (isNaN(percentage) || percentage < 0 || percentage > 100) {
       // Если значение некорректное, возвращаем исходное
@@ -164,7 +166,9 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
   const handleDeleteWorkType = async (workType: EstimateSectionWorkTypeDetail) => {
     // Если тип работ еще не создан (id = 0), просто сбрасываем процент
     if (workType.id === 0) {
-      setEditingPercentages({ ...editingPercentages, [workType.work_type]: '0' });
+      const sectionKey = section.id > 0 ? section.id : `cat-${section.work_category}`;
+      const workTypeKey = `s${sectionKey}-wt${workType.work_type}`;
+      setEditingPercentages({ ...editingPercentages, [workTypeKey]: '0' });
       // Сохраняем процент 0
       try {
         await createEstimateSectionWorkType({
@@ -208,7 +212,9 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
     }
   };
 
-  const totalPercentage = allWorkTypes.reduce((sum, wt) => sum + wt.percentage, 0);
+  const totalPercentage = useMemo(() => {
+    return allWorkTypes.reduce((sum, wt) => sum + wt.percentage, 0);
+  }, [allWorkTypes]);
 
   return (
     <>
@@ -270,9 +276,13 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
         ) : (
           <>
             <div className="space-y-3 mb-4">
-              {allWorkTypes.map((workType) => {
-                // Используем work_type как ключ, так как id может быть 0
-                const workTypeKey = workType.id > 0 ? workType.id : workType.work_type;
+              {allWorkTypes.map((workType, index) => {
+                // Уникальный ключ: комбинация section и work_type
+                const sectionKey = section.id > 0 ? section.id : `cat-${section.work_category}`;
+                const workTypeKey = workType.id > 0 
+                  ? `s${sectionKey}-wt${workType.id}` 
+                  : `s${sectionKey}-wt${workType.work_type}-i${index}`;
+                
                 const isEditing = editingPercentages[workTypeKey] !== undefined;
                 const displayValue = isEditing 
                   ? editingPercentages[workTypeKey] 

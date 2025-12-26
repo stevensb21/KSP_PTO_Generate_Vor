@@ -139,7 +139,7 @@ export default function EstimateDetailsClient({ estimate }: EstimateDetailsClien
             {/* Карточки для управления разделами */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {allSections.map((section) => (
-                <div key={section.work_category} className="min-w-0">
+                <div key={`section-${section.work_category}-${section.id}`} className="min-w-0">
                   <SectionCard
                     section={section}
                     estimateId={estimate.id}
