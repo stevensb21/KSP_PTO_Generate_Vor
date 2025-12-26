@@ -1,8 +1,7 @@
 import axios from 'axios';
 
 // Базовый URL для API (ваш Django сервер)
-// В Server Components может быть нужен другой URL (например, если работают в Docker)
-// Для Server Components в Docker используем имя сервиса, для Client Components - localhost
+// Все значения должны приходить из переменных окружения
 const getApiUrl = () => {
   // В Server Components (нет window) - используем SERVER_API_URL или имя сервиса Docker
   if (typeof window === 'undefined') {
@@ -14,13 +13,15 @@ const getApiUrl = () => {
     if (process.env.NEXT_PUBLIC_API_URL) {
       return process.env.NEXT_PUBLIC_API_URL;
     }
-    // По умолчанию для Server Components используем localhost (для локального запуска)
-    // Если фронтенд в Docker, нужно установить SERVER_API_URL=http://api:8000/api
-    return 'http://31.177.111.37:8001/api';
+    // Если ничего не установлено - выбрасываем ошибку
+    throw new Error('SERVER_API_URL or NEXT_PUBLIC_API_URL must be set for Server Components');
   }
   
-  // В Client Components (браузер) - всегда используем NEXT_PUBLIC_API_URL или localhost
-  return process.env.NEXT_PUBLIC_API_URL || 'http://31.177.111.37:8001/api';
+  // В Client Components (браузер) - используем NEXT_PUBLIC_API_URL
+  if (!process.env.NEXT_PUBLIC_API_URL) {
+    throw new Error('NEXT_PUBLIC_API_URL must be set in environment variables');
+  }
+  return process.env.NEXT_PUBLIC_API_URL;
 };
 
 const API_URL = getApiUrl();
@@ -34,14 +35,15 @@ if (process.env.NODE_ENV === 'development') {
   console.log(`${logPrefix} SERVER_API_URL:`, process.env.SERVER_API_URL);
 }
 
-// Отладка: выводим URL в консоль (только в development)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  console.log('API URL:', API_URL);
-  console.log('NEXT_PUBLIC_API_URL from env:', process.env.NEXT_PUBLIC_API_URL);
+// Токен по умолчанию - только из переменных окружения
+const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
+
+if (!DEFAULT_TOKEN) {
+  console.error('ERROR: NEXT_PUBLIC_API_TOKEN must be set in environment variables');
 }
 
-// Токен по умолчанию (можно переопределить через переменную окружения)
-const DEFAULT_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || '281ffa76936d4d230b0567431060516bfba2545d';
+
+
 // Функция для получения токена из localStorage или использования токена по умолчанию
 const getToken = (): string | null => {
   // В Server Components (нет window) всегда используем токен по умолчанию
@@ -187,8 +189,4 @@ export const authApi = {
       setAuthToken(null);
     }
   },
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> 9a59b70c633a0b85ca377fbdb8c9aa410f6c1e27
