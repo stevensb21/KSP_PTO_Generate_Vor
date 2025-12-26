@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'corsheaders',  # CORS для фронтенда
     'drf_spectacular', #swagger
     'rest_framework',  # Django REST Framework
+    'rest_framework.authtoken',  # Token authentication
     'apps.reference',  # Справочники
     'apps.templates', # Шаблоны
     'apps.estimates', # ВОР
@@ -56,6 +57,13 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
     ],
 }
 

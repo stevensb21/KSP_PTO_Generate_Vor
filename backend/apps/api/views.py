@@ -1,6 +1,8 @@
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters, views, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.authtoken.models import Token
 from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.reference.models import (
@@ -150,3 +152,34 @@ class EstimateItemResourceViewSet(viewsets.ModelViewSet):
     search_fields = ['resource__name', 'estimate_item__work__name']
     ordering_fields = ['estimate_item', 'resource']
     ordering = ['estimate_item', 'resource']
+
+
+# ========== Authentication Views ==========
+
+class CustomAuthToken(ObtainAuthToken):
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data,
+                                           context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        token, created = Token.objects.get_or_create(user=user)
+        return Response({
+            'token': token.key,
+            'user_id': user.pk,
+            'username': user.username,
+            'email': user.email if hasattr(user, 'email') else None
+        })
+
+
+class LogoutView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = None  # Явно указываем, что serializer не нужен
+    
+    def post(self, request):
+        try:
+            request.user.auth_token.delete()
+            return Response({'message': 'Successfully logged out.'}, 
+                          status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, 
+                          status=status.HTTP_400_BAD_REQUEST)

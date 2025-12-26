@@ -4,7 +4,8 @@ from .views import (
     WorkCategoryViewSet, WorkTypeViewSet, WorkViewSet, ResourceViewSet,
     WorkTypeWorkViewSet, WorkResourceViewSet,
     EstimateViewSet, EstimateSectionViewSet, EstimateSectionWorkTypeViewSet,
-    EstimateItemViewSet, EstimateItemResourceViewSet
+    EstimateItemViewSet, EstimateItemResourceViewSet,
+    CustomAuthToken, LogoutView
 )
 
 router = DefaultRouter()
@@ -22,4 +23,6 @@ router.register(r'estimate-item-resources', EstimateItemResourceViewSet, basenam
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('auth/login/', CustomAuthToken.as_view(), name='api_token_auth'),
+    path('auth/logout/', LogoutView.as_view(), name='api_logout'),
 ]
