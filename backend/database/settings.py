@@ -180,6 +180,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
+    "http://bop.hrscp.net:3001",
+    "http://31.177.111.37:3001",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
