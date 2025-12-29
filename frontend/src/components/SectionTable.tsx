@@ -52,7 +52,7 @@ export default function SectionTable({
       resources.forEach((resource, index) => {
         tableRows.push({
           number: `${workNumber}.${index + 1}`,
-          name: `→ ${resource.resource_name}`,
+          name: `${resource.resource_name}`,
           unit: resource.resource_unit,
           quantity: resource.quantity,
           isResource: true,
@@ -129,7 +129,7 @@ export default function SectionTable({
                   </td>
                   <td className="border border-gray-300 px-4 py-3 text-gray-500 font-normal">
                     {row.isResource ? (
-                      <span className="text-gray-700 font-normal">Норму расхода - по сметной норме смотреть расход</span>
+                      <span className="text-gray-700 font-normal">Норма расхода уточнить по смете</span>
                     ) : (
                       <span className="font-bold text-gray-900"></span>
                     )}

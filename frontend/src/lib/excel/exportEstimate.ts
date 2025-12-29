@@ -205,7 +205,7 @@ function buildEstimateWorksheet(
             `→ ${resource.resource_name}`,
             resource.resource_unit,
             resource.quantity === 0 ? 'По сметному расчету' : resource.quantity.toFixed(2),
-            'Норму расхода - по сметной норме смотреть расход'
+            'Норма расхода уточнить по смете'
           ]);
 
           resourceRow.fill = {
@@ -213,7 +213,7 @@ function buildEstimateWorksheet(
             pattern: 'solid',
             fgColor: { argb: 'FFF9FAFB' } // Серый цвет (gray-50)
           };
-          resourceRow.font = { size: 11, color: { argb: 'FF374151' } }; // Серый текст (gray-700)
+          resourceRow.font = { size: 11, color: { argb: 'FF374151' }, italic: true }; // Серый текст (gray-700), курсив
           resourceRow.height = 50;
 
           resourceRow.eachCell((cell: any, colNumber: number) => {

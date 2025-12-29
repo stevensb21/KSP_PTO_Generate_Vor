@@ -34,7 +34,7 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
 
         // Создаем Map существующих типов работ в разделе
         const existingWorkTypesMap = new Map(
-          (section.work_types || []).map((wt: EstimateSectionWorkTypeDetail) => [wt.work_type, wt])
+          (section.work_types || []).map((wt) => [wt.work_type, wt as EstimateSectionWorkTypeDetail])
         );
 
         // Объединяем: существующие + отсутствующие типы работ
@@ -73,7 +73,7 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
       setAllWorkTypes((prev) => {
         // Создаем Map для быстрого поиска
         const sectionWorkTypesMap = new Map(
-          section.work_types.map((wt: EstimateSectionWorkTypeDetail) => [wt.work_type, wt])
+          section.work_types.map((wt) => [wt.work_type, wt])
         );
         
         // Обновляем проценты в существующих типах работ
@@ -275,7 +275,7 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
         {/* Поле общей площади */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Общая площадь {section.work_category_name.toLowerCase()}
+            Полезная площадь здания
           </label>
           <div className="flex gap-2 flex-wrap">
             <input
