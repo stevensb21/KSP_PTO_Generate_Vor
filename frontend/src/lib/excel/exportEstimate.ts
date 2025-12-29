@@ -79,22 +79,32 @@ function buildEstimateWorksheet(
 
   // 2. Заголовки таблицы (зеленая строка)
   const headerRow = worksheet.addRow(['№', 'Наименование работ', 'Ед. изм.', 'Кол-во', 'Примечание']);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-  headerRow.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF16A34A' } // Зеленый цвет (green-600)
-  };
   headerRow.height = 40;
   
-  headerRow.eachCell((cell: any) => {
-    cell.border = {
-      top: { style: 'thin', color: { argb: 'FF000000' } },
-      left: { style: 'thin', color: { argb: 'FF000000' } },
-      bottom: { style: 'thin', color: { argb: 'FF000000' } },
-      right: { style: 'thin', color: { argb: 'FF000000' } }
-    };
-    cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+  headerRow.eachCell((cell: any, colNumber: number) => {
+    // Применяем форматирование только к ячейкам 1-5
+    if (colNumber <= 5) {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF16A34A' } // Зеленый цвет (green-600)
+      };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF000000' } },
+        left: { style: 'thin', color: { argb: 'FF000000' } },
+        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+        right: { style: 'thin', color: { argb: 'FF000000' } }
+      };
+      
+      if (colNumber === 4) { // Кол-во
+        cell.numFmt = '@'; // Текстовый формат
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+      }
+    }
   });
   currentRow++;
 
@@ -169,54 +179,18 @@ function buildEstimateWorksheet(
           ''
         ]);
 
-        workRow.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFFFFFFF' } // Белый цвет
-        };
-        workRow.font = { bold: true, size: 11, color: { argb: 'FF111827' } }; // Темный текст (gray-900)
         workRow.height = 50;
 
         workRow.eachCell((cell: any, colNumber: number) => {
-          cell.border = {
-            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-            bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-            right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
-          };
-
-          if (colNumber === 1) { // №
-            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-          } else if (colNumber === 3) { // Ед. изм.
-            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-          } else if (colNumber === 4) { // Кол-во
-            cell.alignment = { horizontal: 'right', vertical: 'middle', wrapText: true };
-          } else { // Наименование и Примечание
-            cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-          }
-        });
-        currentRow++;
-
-        // Добавляем ресурсы для этой работы (серая строка, обычный текст)
-        const resources = (item as EstimateItemDetail).resources || [];
-        resources.forEach((resource, index) => {
-          const resourceRow = worksheet.addRow([
-            `${workNumber}.${index + 1}`,
-            `→ ${resource.resource_name}`,
-            resource.resource_unit,
-            resource.quantity === 0 ? 'По сметному расчету' : resource.quantity.toFixed(2),
-            'Норма расхода уточнить по смете'
-          ]);
-
-          resourceRow.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF9FAFB' } // Серый цвет (gray-50)
-          };
-          resourceRow.font = { size: 11, color: { argb: 'FF374151' }, italic: true }; // Серый текст (gray-700), курсив
-          resourceRow.height = 50;
-
-          resourceRow.eachCell((cell: any, colNumber: number) => {
+          // Применяем форматирование только к ячейкам 1-5
+          if (colNumber <= 5) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFFFFF' } // Белый цвет
+            };
+            cell.font = { bold: true, size: 11, color: { argb: 'FF111827' } }; // Темный текст (gray-900)
+            
             cell.border = {
               top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
               left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
@@ -229,9 +203,57 @@ function buildEstimateWorksheet(
             } else if (colNumber === 3) { // Ед. изм.
               cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
             } else if (colNumber === 4) { // Кол-во
-              cell.alignment = { horizontal: 'right', vertical: 'middle', wrapText: true };
+              // Формат как текст, выровнен по центру
+              cell.numFmt = '@'; // Текстовый формат
+              cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
             } else { // Наименование и Примечание
               cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            }
+          }
+        });
+        currentRow++;
+
+        // Добавляем ресурсы для этой работы (серая строка, обычный текст)
+        const resources = (item as EstimateItemDetail).resources || [];
+        resources.forEach((resource, index) => {
+          const resourceRow = worksheet.addRow([
+            `${workNumber}.${index + 1}`,
+            `${resource.resource_name}`,
+            resource.resource_unit,
+            resource.quantity === 0 ? 'По сметному расчету' : resource.quantity.toFixed(2),
+            'Норма расхода уточнить по смете'
+          ]);
+
+          resourceRow.height = 50;
+
+          resourceRow.eachCell((cell: any, colNumber: number) => {
+            // Применяем форматирование только к ячейкам 1-5
+            if (colNumber <= 5) {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFF9FAFB' } // Серый цвет (gray-50)
+              };
+              cell.font = { size: 11, color: { argb: 'FF374151' }, italic: true }; // Серый текст (gray-700), курсив
+              
+              cell.border = {
+                top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+              };
+
+              if (colNumber === 1) { // №
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+              } else if (colNumber === 3) { // Ед. изм.
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+              } else if (colNumber === 4) { // Кол-во
+                // Формат как текст, выровнен по центру
+                cell.numFmt = '@'; // Текстовый формат
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+              } else { // Наименование и Примечание
+                cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+              }
             }
           });
           currentRow++;
