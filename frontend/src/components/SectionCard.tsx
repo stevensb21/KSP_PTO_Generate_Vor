@@ -67,6 +67,27 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
     // Зависимости: только work_category и id раздела, чтобы не перезагружать при каждом изменении
   }, [section.work_category, section.id]);
 
+  // Синхронизируем проценты из пропса section с локальным состоянием
+  useEffect(() => {
+    if (section.work_types && section.work_types.length > 0) {
+      setAllWorkTypes((prev) => {
+        // Создаем Map для быстрого поиска
+        const sectionWorkTypesMap = new Map(
+          section.work_types.map((wt: EstimateSectionWorkTypeDetail) => [wt.work_type, wt])
+        );
+        
+        // Обновляем проценты в существующих типах работ
+        return prev.map((wt) => {
+          const updated = sectionWorkTypesMap.get(wt.work_type);
+          if (updated && updated.percentage !== wt.percentage) {
+            return { ...wt, percentage: updated.percentage, id: updated.id };
+          }
+          return wt;
+        });
+      });
+    }
+  }, [section.work_types]);
+
   const handleAreaSave = async () => {
     const area = parseFloat(totalArea);
     if (isNaN(area) || area < 0) {
@@ -136,17 +157,35 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
     }
 
     try {
+      let updatedWorkType;
+      
       // Если тип работ еще не создан (id = 0), создаем его
       if (workType.id === 0) {
-        await createEstimateSectionWorkType({
+        updatedWorkType = await createEstimateSectionWorkType({
           section: section.id,
           work_type: workType.work_type,
           percentage: percentage,
         });
       } else {
         // Иначе обновляем существующий
-        await updateEstimateSectionWorkType(workType.id, { percentage });
+        updatedWorkType = await updateEstimateSectionWorkType(workType.id, { percentage });
       }
+      
+      // Обновляем локальное состояние сразу, чтобы пользователь видел изменения
+      setAllWorkTypes((prev) => {
+        return prev.map((wt) => {
+          if (wt.work_type === workType.work_type) {
+            // Используем данные из ответа API, если доступны
+            return { 
+              ...wt, 
+              percentage: updatedWorkType?.percentage ?? percentage,
+              id: updatedWorkType?.id ?? wt.id
+            };
+          }
+          return wt;
+        });
+      });
+      
       router.refresh();
       setEditingPercentages((prev) => {
         const newPercentages = { ...prev };
