@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { updateEstimateSection, createEstimateSection, updateEstimateSectionWorkType, createEstimateSectionWorkType, deleteEstimateSectionWorkType, deleteEstimateSection, getWorkTypes } from '@/lib/api/estimates';
+import { updateEstimateSectionWorkType, createEstimateSectionWorkType, deleteEstimateSectionWorkType, getWorkTypes } from '@/lib/api/estimates';
 import type { EstimateSectionDetail, EstimateSectionWorkTypeDetail, WorkType } from '@/types';
 
 interface SectionCardProps {
@@ -13,9 +13,6 @@ interface SectionCardProps {
 
 export default function SectionCard({ section, estimateId, onAddWorkType }: SectionCardProps) {
   const router = useRouter();
-  const [totalArea, setTotalArea] = useState<string>(section.total_area.toString());
-  const [isSavingArea, setIsSavingArea] = useState(false);
-  const [isEditingArea, setIsEditingArea] = useState(false);
   const [editingPercentages, setEditingPercentages] = useState<Record<string, string>>({});
   const [allWorkTypes, setAllWorkTypes] = useState<EstimateSectionWorkTypeDetail[]>([]);
 
@@ -88,40 +85,6 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
     }
   }, [section.work_types]);
 
-  const handleAreaSave = async () => {
-    const area = parseFloat(totalArea);
-    if (isNaN(area) || area < 0) {
-      // Если значение некорректное, возвращаем исходное
-      setTotalArea(section.total_area.toString());
-      return;
-    }
-
-    // Если значение не изменилось, не сохраняем
-    if (area === section.total_area && section.id > 0) {
-      return;
-    }
-
-    setIsSavingArea(true);
-    try {
-      // Если раздел еще не создан (id = 0), создаем его
-      if (section.id === 0) {
-        await createEstimateSection({
-          estimate: estimateId,
-          work_category: section.work_category,
-          total_area: area,
-        });
-      } else {
-        // Иначе обновляем существующий
-        await updateEstimateSection(section.id, { total_area: area });
-      }
-      router.refresh();
-    } catch (err) {
-      alert('Ошибка при сохранении площади');
-      setTotalArea(section.total_area.toString());
-    } finally {
-      setIsSavingArea(false);
-    }
-  };
 
   const handlePercentageSave = async (workTypeKey: string, workType: EstimateSectionWorkTypeDetail, value: string) => {
     const percentage = parseFloat(value);
@@ -186,12 +149,15 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
         });
       });
       
-      router.refresh();
+      // Очищаем состояние редактирования
       setEditingPercentages((prev) => {
         const newPercentages = { ...prev };
         delete newPercentages[workTypeKey];
         return newPercentages;
       });
+      
+      // Обновляем данные с сервера
+      router.refresh();
     } catch (err) {
       alert('Ошибка при сохранении процента');
       setEditingPercentages((prev) => {
@@ -203,22 +169,9 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
   };
 
   const handleDeleteWorkType = async (workType: EstimateSectionWorkTypeDetail) => {
-    // Если тип работ еще не создан (id = 0), просто сбрасываем процент
+    // Если тип работ еще не создан (id = 0), просто удаляем из локального состояния
     if (workType.id === 0) {
-      const sectionKey = section.id > 0 ? section.id : `cat-${section.work_category}`;
-      const workTypeKey = `s${sectionKey}-wt${workType.work_type}`;
-      setEditingPercentages({ ...editingPercentages, [workTypeKey]: '0' });
-      // Сохраняем процент 0
-      try {
-        await createEstimateSectionWorkType({
-          section: section.id,
-          work_type: workType.work_type,
-          percentage: 0,
-        });
-        router.refresh();
-      } catch (err) {
-        // Игнорируем ошибку, если раздел еще не создан
-      }
+      setAllWorkTypes(prev => prev.filter(wt => wt.work_type !== workType.work_type));
       return;
     }
 
@@ -226,6 +179,9 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
     
     try {
       await deleteEstimateSectionWorkType(workType.id);
+      // Сразу обновляем локальное состояние
+      setAllWorkTypes(prev => prev.filter(wt => wt.id !== workType.id));
+      // Обновляем данные с сервера
       router.refresh();
     } catch (err) {
       alert('Ошибка при удалении типа работ');
@@ -233,21 +189,21 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
   };
 
   const handleDeleteSection = async () => {
-    // Если раздел еще не создан (id = 0), просто сбрасываем площадь
+    // Если раздел еще не создан (id = 0), ничего не делаем
     if (section.id === 0) {
-      setTotalArea('0');
-      setIsEditingArea(false);
-      router.refresh();
       return;
     }
 
-    if (!confirm(`Удалить вид работ "${section.work_category_name}"? Это также удалит все типы работ, работы и ресурсы в этом разделе.`)) return;
+    if (!confirm(`Удалить все типы работ в разделе "${section.work_category_name}"? Раздел останется, но все проценты будут удалены.`)) return;
     
     try {
-      await deleteEstimateSection(section.id);
+      // Удаляем все типы работ в разделе, но сам раздел оставляем
+      const workTypesToDelete = allWorkTypes.filter(wt => wt.id > 0);
+      const deletePromises = workTypesToDelete.map(wt => deleteEstimateSectionWorkType(wt.id));
+      await Promise.all(deletePromises);
       router.refresh();
     } catch (err) {
-      alert('Ошибка при удалении вида работ');
+      alert('Ошибка при удалении типов работ');
     }
   };
 
@@ -266,46 +222,23 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
           <button
             onClick={handleDeleteSection}
             className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-medium flex-shrink-0"
-            title="Удалить вид работ"
+            title="Удалить все типы работ (проценты) в этом разделе"
           >
-            ✕ Удалить
+            ✕ Удалить проценты
           </button>
         </div>
 
-        {/* Поле общей площади */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Полезная площадь здания
-          </label>
-          <div className="flex gap-2 flex-wrap">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={totalArea}
-              onChange={(e) => setTotalArea(e.target.value)}
-              onBlur={handleAreaSave}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.currentTarget.blur();
-                }
-              }}
-              disabled={isSavingArea}
-              className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            />
-            <button
-              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex-shrink-0"
-              disabled
-            >
-              M2
-            </button>
-            {isSavingArea && (
-              <span className="px-3 py-2 text-gray-500 text-sm flex items-center">
-                Сохранение...
-              </span>
-            )}
+        {/* Отображение площади (только для чтения) */}
+        {section.total_area > 0 && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Полезная площадь здания
+            </label>
+            <div className="text-lg font-semibold text-gray-800">
+              {section.total_area} м²
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Список типов работ */}
         {allWorkTypes.length === 0 ? (
@@ -323,9 +256,10 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
                   : `s${sectionKey}-wt${workType.work_type}-i${index}`;
                 
                 const isEditing = editingPercentages[workTypeKey] !== undefined;
+                // Если процент 0 и не в процессе редактирования - показываем пустое поле
                 const displayValue = isEditing 
                   ? editingPercentages[workTypeKey] 
-                  : workType.percentage.toString();
+                  : (workType.percentage > 0 ? workType.percentage.toString() : '');
 
                 return (
                   <div key={workTypeKey} className="flex items-start gap-2 min-w-0">
@@ -335,7 +269,7 @@ export default function SectionCard({ section, estimateId, onAddWorkType }: Sect
                     <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
                       <input
                         type="number"
-                        step="0.01"
+                        step="1"
                         min="0"
                         max="100"
                         value={displayValue}

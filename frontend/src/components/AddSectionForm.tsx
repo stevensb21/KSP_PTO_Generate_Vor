@@ -6,14 +6,15 @@ import type { WorkCategory } from '@/types';
 
 interface AddSectionFormProps {
   estimateId: number;
+  totalArea?: number; // Общая площадь ВОР для применения к новому разделу
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export default function AddSectionForm({ estimateId, onSuccess, onCancel }: AddSectionFormProps) {
+export default function AddSectionForm({ estimateId, totalArea = 0, onSuccess, onCancel }: AddSectionFormProps) {
   const [workCategories, setWorkCategories] = useState<WorkCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number>(0);
-  const [totalArea, setTotalArea] = useState<string>('');
+  const [sectionArea, setSectionArea] = useState<string>(totalArea > 0 ? totalArea.toString() : '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
@@ -39,7 +40,7 @@ export default function AddSectionForm({ estimateId, onSuccess, onCancel }: AddS
       return;
     }
 
-    const area = parseFloat(totalArea);
+    const area = parseFloat(sectionArea);
     if (isNaN(area) || area <= 0) {
       setError('Введите корректную площадь (больше 0)');
       return;
@@ -47,6 +48,7 @@ export default function AddSectionForm({ estimateId, onSuccess, onCancel }: AddS
 
     setIsLoading(true);
     try {
+      // При создании раздела используем указанную площадь
       await createEstimateSection({
         estimate: estimateId,
         work_category: selectedCategory,
@@ -93,10 +95,10 @@ export default function AddSectionForm({ estimateId, onSuccess, onCancel }: AddS
               type="number"
               step="0.01"
               min="0.01"
-              value={totalArea}
-              onChange={(e) => setTotalArea(e.target.value)}
+              value={sectionArea}
+              onChange={(e) => setSectionArea(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="150.00"
+              placeholder="Введите площадь"
               required
             />
           </div>

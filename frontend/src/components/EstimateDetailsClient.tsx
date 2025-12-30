@@ -6,7 +6,7 @@ import SectionCard from './SectionCard';
 import SectionTable from './SectionTable';
 import EditEstimateForm from './EditEstimateForm';
 import { exportEstimateToExcel } from '@/lib/excel/exportEstimate';
-import { deleteEstimate, getWorkCategories } from '@/lib/api/estimates';
+import { deleteEstimate, getWorkCategories, updateEstimateSection, createEstimateSection } from '@/lib/api/estimates';
 import type { EstimateDetail, EstimateSectionDetail, WorkCategory } from '@/types';
 
 interface EstimateDetailsClientProps {
@@ -18,6 +18,14 @@ export default function EstimateDetailsClient({ estimate }: EstimateDetailsClien
   const [showEditEstimate, setShowEditEstimate] = useState(false);
   const [workCategories, setWorkCategories] = useState<WorkCategory[]>([]);
   const [allSections, setAllSections] = useState<EstimateSectionDetail[]>([]);
+  // Получаем площадь из первого раздела с площадью > 0, или 0 если таких нет
+  const getInitialTotalArea = () => {
+    const sectionWithArea = estimate.sections.find(s => s.total_area > 0);
+    return sectionWithArea ? sectionWithArea.total_area : 0;
+  };
+  const initialTotalArea = getInitialTotalArea();
+  const [totalArea, setTotalArea] = useState<string>(initialTotalArea > 0 ? initialTotalArea.toString() : '');
+  const [isSavingArea, setIsSavingArea] = useState(false);
 
   // Загружаем все виды работ из справочника
   useEffect(() => {
@@ -44,7 +52,7 @@ export default function EstimateDetailsClient({ estimate }: EstimateDetailsClien
             estimate_name: estimate.name,
             work_category: category.id,
             work_category_name: category.name,
-            total_area: 0,
+            total_area: initialTotalArea,
             work_types: [],
             work_types_count: 0,
           } as EstimateSectionDetail;
@@ -60,6 +68,14 @@ export default function EstimateDetailsClient({ estimate }: EstimateDetailsClien
 
     loadWorkCategories();
   }, [estimate]);
+
+  // Обновляем площадь при изменении estimate
+  useEffect(() => {
+    const newInitialArea = getInitialTotalArea();
+    if (newInitialArea > 0 && totalArea !== newInitialArea.toString()) {
+      setTotalArea(newInitialArea.toString());
+    }
+  }, [estimate.sections]);
 
   const handleEstimateUpdated = () => {
     setShowEditEstimate(false);
@@ -80,6 +96,74 @@ export default function EstimateDetailsClient({ estimate }: EstimateDetailsClien
     }
   };
 
+  const handleTotalAreaSave = async () => {
+    const area = parseFloat(totalArea);
+    if (isNaN(area) || area <= 0) {
+      // Если значение некорректное, возвращаем исходное
+      setTotalArea(initialTotalArea > 0 ? initialTotalArea.toString() : '');
+      return;
+    }
+
+    setIsSavingArea(true);
+    try {
+      // Создаем или обновляем разделы для всех видов работ
+      const existingSectionsMap = new Map(
+        allSections.filter(s => s.id > 0).map(s => [s.work_category, s])
+      );
+      
+      const promises: Promise<any>[] = [];
+      
+      // Для каждой категории работ из справочника
+      for (const category of workCategories) {
+        const existingSection = existingSectionsMap.get(category.id);
+        
+        if (existingSection) {
+          // Если раздел существует - обновляем его площадь
+          promises.push(updateEstimateSection(existingSection.id, { total_area: area }));
+        } else {
+          // Если раздела нет - создаем новый с указанной площадью
+          promises.push(createEstimateSection({
+            estimate: estimate.id,
+            work_category: category.id,
+            total_area: area,
+          }));
+        }
+      }
+      
+      await Promise.all(promises);
+      
+      // Обновляем локальное состояние всех разделов новой площадью
+      setAllSections(prevSections => {
+        const existingMap = new Map(prevSections.filter(s => s.id > 0).map(s => [s.work_category, s]));
+        return workCategories.map(category => {
+          const existing = existingMap.get(category.id);
+          if (existing) {
+            return { ...existing, total_area: area };
+          }
+          return {
+            id: 0, // Временный ID, будет обновлен после refresh
+            estimate: estimate.id,
+            estimate_name: estimate.name,
+            work_category: category.id,
+            work_category_name: category.name,
+            total_area: area,
+            work_types: [],
+            work_types_count: 0,
+          } as EstimateSectionDetail;
+        });
+      });
+      
+      // Обновляем данные с сервера
+      router.refresh();
+    } catch (err: any) {
+      alert('Ошибка при сохранении площади: ' + (err.response?.data?.detail || err.message));
+      // Восстанавливаем исходную площадь
+      setTotalArea(initialTotalArea > 0 ? initialTotalArea.toString() : '');
+    } finally {
+      setIsSavingArea(false);
+    }
+  };
+
   return (
     <>
       <div className="space-y-6">
@@ -94,6 +178,37 @@ export default function EstimateDetailsClient({ estimate }: EstimateDetailsClien
               <p className="text-sm text-gray-500 mt-1">
                 Статус: <span className="font-medium">{getStatusLabel(estimate.status)}</span>
               </p>
+              
+              {/* Поле полезной площади здания */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Полезная площадь здания
+                </label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={totalArea}
+                    onChange={(e) => setTotalArea(e.target.value)}
+                    onBlur={handleTotalAreaSave}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    disabled={isSavingArea}
+                    placeholder="Введите площадь"
+                    className="flex-1 max-w-xs border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                  <span className="text-gray-600 font-medium">м²</span>
+                  {isSavingArea && (
+                    <span className="text-gray-500 text-sm">
+                      Сохранение...
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="flex gap-3  ">
               {/* Кнопка экспорта в Excel */}

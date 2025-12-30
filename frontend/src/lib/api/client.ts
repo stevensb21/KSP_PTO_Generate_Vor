@@ -58,6 +58,15 @@ const getToken = (): string | null => {
   // В Client Components сначала проверяем localStorage
   let token = localStorage.getItem('auth_token');
   
+  // Если токен в localStorage не совпадает с DEFAULT_TOKEN, обновляем его
+  if (DEFAULT_TOKEN && token !== DEFAULT_TOKEN) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[CLIENT] Token mismatch detected. Updating localStorage token.');
+    }
+    token = DEFAULT_TOKEN;
+    localStorage.setItem('auth_token', DEFAULT_TOKEN);
+  }
+  
   // Если токена нет в localStorage, используем токен по умолчанию
   if (!token && DEFAULT_TOKEN) {
     token = DEFAULT_TOKEN;
@@ -130,10 +139,15 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Инициализация токена при загрузке (если его нет в localStorage)
+// Инициализация токена при загрузке (если его нет в localStorage или он не совпадает)
 if (typeof window !== 'undefined') {
   const storedToken = localStorage.getItem('auth_token');
-  if (!storedToken && DEFAULT_TOKEN) {
+  if (DEFAULT_TOKEN && storedToken !== DEFAULT_TOKEN) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[CLIENT] Initializing/updating token in localStorage');
+    }
+    localStorage.setItem('auth_token', DEFAULT_TOKEN);
+  } else if (!storedToken && DEFAULT_TOKEN) {
     localStorage.setItem('auth_token', DEFAULT_TOKEN);
   }
 }
